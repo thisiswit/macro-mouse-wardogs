@@ -1,5 +1,7 @@
 # Macro Mouse
 
+Repositório: <https://github.com/thisiswit/macro-mouse-wardogs>
+
 Auto-clicker para Windows, com janela. Você segura um atalho (por exemplo **Ctrl + Shift + Z** ou o botão lateral do mouse) e o mouse clica sozinho, muito rápido. Soltou, parou.
 
 - Liga e desliga por um botão na janela
@@ -98,17 +100,15 @@ winget install -e --id Git.Git --source winget --accept-source-agreements --acce
 **Feche e abra o PowerShell de novo** e baixe o projeto:
 
 ```powershell
-git clone https://github.com/SEU-USUARIO/macro-mouse.git "$HOME\MacroMouse"
+git clone https://github.com/thisiswit/macro-mouse-wardogs.git "$HOME\MacroMouse"
 ```
 
-**Opção 2: baixando o ZIP**
-
-1. Na página do projeto no GitHub, clique no botão verde **Code** e depois em **Download ZIP**.
-2. Com o arquivo na pasta **Downloads**, rode o comando abaixo. Se o nome do arquivo baixado não for `macro-mouse-main.zip`, troque o nome nas duas primeiras linhas.
+**Opção 2: sem Git (baixa o ZIP)**
 
 ```powershell
-Expand-Archive "$HOME\Downloads\macro-mouse-main.zip" -DestinationPath $HOME
-Rename-Item "$HOME\macro-mouse-main" MacroMouse
+curl.exe -L -o "$HOME\Downloads\macro-mouse-wardogs.zip" https://github.com/thisiswit/macro-mouse-wardogs/archive/refs/heads/main.zip
+Expand-Archive "$HOME\Downloads\macro-mouse-wardogs.zip" -DestinationPath $HOME
+Rename-Item "$HOME\macro-mouse-wardogs-main" MacroMouse
 Get-ChildItem "$HOME\MacroMouse" | Unblock-File
 ```
 
@@ -202,7 +202,7 @@ No terminal do Ubuntu:
 
 ```bash
 sudo apt update && sudo apt install -y git
-git clone https://github.com/SEU-USUARIO/macro-mouse.git ~/macro-mouse
+git clone https://github.com/thisiswit/macro-mouse-wardogs.git ~/macro-mouse
 ```
 
 > O `sudo` pede a senha que você criou no B1.
@@ -234,16 +234,10 @@ macromouse
 
 ### B6. (Opcional) Ícone na Área de Trabalho ou abrir junto com o Windows
 
-Use os comandos do [A5](#a5-opcional-ícone-na-área-de-trabalho) ou do [A6](#a6-opcional-abrir-junto-com-o-windows) no PowerShell. Troque só a primeira linha (`$app = ...`) pelo caminho do app dentro do WSL. Para descobrir esse caminho, rode no Ubuntu:
-
-```bash
-wslpath -w ~/macro-mouse/MacroMouse.pyw
-```
-
-A saída é algo como `\\wsl.localhost\Ubuntu\home\seu-usuario\macro-mouse\MacroMouse.pyw`. Use assim no PowerShell:
+Use os comandos do [A5](#a5-opcional-ícone-na-área-de-trabalho) ou do [A6](#a6-opcional-abrir-junto-com-o-windows) no PowerShell, trocando só a primeira linha (`$app = ...`) por esta. Ela pede ao WSL o caminho do app:
 
 ```powershell
-$app = "\\wsl.localhost\Ubuntu\home\seu-usuario\macro-mouse\MacroMouse.pyw"
+$app = wsl.exe -e bash -c 'wslpath -w ~/macro-mouse/MacroMouse.pyw'
 ```
 
 > Se o WSL estiver desligado, o app demora alguns segundos a mais para abrir, porque o Windows liga o WSL para ler os arquivos.
