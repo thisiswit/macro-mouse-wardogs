@@ -38,6 +38,8 @@ Auto-clicker para Windows, com janela. Você segura um atalho (por exemplo **Ctr
 - Só quer usar → **Caminho A**.
 - Você já trabalha no terminal do WSL e quer abrir o app de lá → **Caminho B**.
 
+**Sobre os comandos:** eles usam `$HOME` (no PowerShell) e `~` (no Linux), que já apontam para a sua pasta de usuário, e descobrem sozinhos onde ficam a Área de Trabalho e o Python. Não precisa trocar nenhum nome ou caminho: é só copiar e colar.
+
 ---
 
 ## Caminho A: Windows
@@ -87,7 +89,7 @@ tkinter OK
 
 ### A3. Baixar o Macro Mouse
 
-Escolha **uma** das opções. As duas deixam o programa na pasta `C:\Users\<seu usuário>\MacroMouse`.
+Escolha **uma** das opções. As duas colocam o programa na pasta `MacroMouse`, dentro da sua pasta de usuário.
 
 **Opção 1: com Git**
 
@@ -106,13 +108,20 @@ git clone https://github.com/thisiswit/macro-mouse-wardogs.git "$HOME\MacroMouse
 **Opção 2: sem Git (baixa o ZIP)**
 
 ```powershell
-curl.exe -L -o "$HOME\Downloads\macro-mouse-wardogs.zip" https://github.com/thisiswit/macro-mouse-wardogs/archive/refs/heads/main.zip
-Expand-Archive "$HOME\Downloads\macro-mouse-wardogs.zip" -DestinationPath $HOME
-Rename-Item "$HOME\macro-mouse-wardogs-main" MacroMouse
-Get-ChildItem "$HOME\MacroMouse" | Unblock-File
+$pasta = "$HOME\MacroMouse"
+if (Test-Path $pasta) {
+    "A pasta $pasta já existe. Apague ou renomeie essa pasta e rode de novo."
+} else {
+    $zip = "$env:TEMP\macro-mouse-wardogs.zip"
+    curl.exe -fL -o $zip https://github.com/thisiswit/macro-mouse-wardogs/archive/refs/heads/main.zip
+    Expand-Archive $zip -DestinationPath "$pasta-tmp" -Force
+    Move-Item (Get-ChildItem "$pasta-tmp" -Directory)[0].FullName $pasta
+    Remove-Item "$pasta-tmp", $zip -Recurse -Force
+    "Pronto: $pasta"
+}
 ```
 
-> A última linha tira o bloqueio que o Windows coloca em arquivos baixados da internet. Sem ela, pode aparecer o aviso "O Windows protegeu o computador".
+> O ZIP é baixado na pasta temporária do Windows e apagado no fim, então não importa onde fica a sua pasta Downloads.
 
 **Conferir** (deve responder `True`):
 
@@ -134,28 +143,44 @@ A janela do **Macro Mouse** abre com o botão verde **LIGADO**. Pronto, já est�
 
 ### A5. (Opcional) Ícone na Área de Trabalho
 
-Cria um ícone **Macro Mouse** na Área de Trabalho, que abre o app direto:
+Cria um ícone **Macro Mouse** na Área de Trabalho, que abre o app direto. O comando acha o app sozinho, esteja ele no Windows (passo A3) ou no WSL (passo B3):
 
 ```powershell
 $app = "$HOME\MacroMouse\MacroMouse.pyw"
-$lnk = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\Macro Mouse.lnk")
-$lnk.TargetPath = (Get-Command pyw).Source
-$lnk.Arguments = "`"$app`""
-$lnk.WorkingDirectory = Split-Path $app
-$lnk.Save()
+if (-not (Test-Path $app) -and (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
+    $app = wsl.exe -e bash -c 'wslpath -w ~/macro-mouse/MacroMouse.pyw' 2>$null
+}
+if ($app -and (Test-Path -LiteralPath "$app")) {
+    $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Desktop'))\Macro Mouse.lnk")
+    $lnk.TargetPath = (Get-Command pyw).Source
+    $lnk.Arguments = "`"$app`""
+    $lnk.WorkingDirectory = Split-Path $app
+    $lnk.Save()
+    "Ícone criado na Área de Trabalho, abrindo: $app"
+} else {
+    "Não achei o Macro Mouse. Confira o passo A3 (ou o B3, se você usa o WSL)."
+}
 ```
 
 ### A6. (Opcional) Abrir junto com o Windows
 
-Faz o Macro Mouse abrir sozinho toda vez que você liga o computador:
+Faz o Macro Mouse abrir sozinho toda vez que você liga o computador. Assim como o A5, acha o app no Windows ou no WSL:
 
 ```powershell
 $app = "$HOME\MacroMouse\MacroMouse.pyw"
-$lnk = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Startup'))\Macro Mouse.lnk")
-$lnk.TargetPath = (Get-Command pyw).Source
-$lnk.Arguments = "`"$app`""
-$lnk.WorkingDirectory = Split-Path $app
-$lnk.Save()
+if (-not (Test-Path $app) -and (Get-Command wsl.exe -ErrorAction SilentlyContinue)) {
+    $app = wsl.exe -e bash -c 'wslpath -w ~/macro-mouse/MacroMouse.pyw' 2>$null
+}
+if ($app -and (Test-Path -LiteralPath "$app")) {
+    $lnk = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Startup'))\Macro Mouse.lnk")
+    $lnk.TargetPath = (Get-Command pyw).Source
+    $lnk.Arguments = "`"$app`""
+    $lnk.WorkingDirectory = Split-Path $app
+    $lnk.Save()
+    "Pronto: o Macro Mouse vai abrir junto com o Windows ($app)"
+} else {
+    "Não achei o Macro Mouse. Confira o passo A3 (ou o B3, se você usa o WSL)."
+}
 ```
 
 Para **desfazer** (parar de abrir com o Windows):
@@ -219,11 +244,12 @@ A janela do **Macro Mouse** abre no Windows e o terminal fica livre na hora. Pod
 
 ### B5. (Opcional) Comando `macromouse`
 
-Para abrir o app de qualquer pasta só digitando `macromouse`:
+Para abrir o app de qualquer pasta só digitando `macromouse`. Funciona no bash e no zsh, e rodar de novo não duplica nada:
 
 ```bash
-echo "alias macromouse='$HOME/macro-mouse/iniciar.sh'" >> ~/.bashrc
-source ~/.bashrc
+rc="$HOME/.$(basename "$SHELL")rc"
+grep -qs "alias macromouse=" "$rc" || echo "alias macromouse='$HOME/macro-mouse/iniciar.sh'" >> "$rc"
+source "$rc"
 ```
 
 Teste:
@@ -234,11 +260,7 @@ macromouse
 
 ### B6. (Opcional) Ícone na Área de Trabalho ou abrir junto com o Windows
 
-Use os comandos do [A5](#a5-opcional-ícone-na-área-de-trabalho) ou do [A6](#a6-opcional-abrir-junto-com-o-windows) no PowerShell, trocando só a primeira linha (`$app = ...`) por esta. Ela pede ao WSL o caminho do app:
-
-```powershell
-$app = wsl.exe -e bash -c 'wslpath -w ~/macro-mouse/MacroMouse.pyw'
-```
+Rode no **PowerShell** (não no Ubuntu) os mesmos comandos do [A5](#a5-opcional-ícone-na-área-de-trabalho) ou do [A6](#a6-opcional-abrir-junto-com-o-windows). Quando o app não está numa pasta do Windows, eles perguntam ao WSL onde fica o `~/macro-mouse` e criam o atalho para lá.
 
 > Se o WSL estiver desligado, o app demora alguns segundos a mais para abrir, porque o Windows liga o WSL para ler os arquivos.
 
@@ -295,10 +317,16 @@ $app = wsl.exe -e bash -c 'wslpath -w ~/macro-mouse/MacroMouse.pyw'
 → Esse `python` é só um atalho do Windows para a loja. Instale pelo [A2](#a2-instalar-o-python) e use `py` nos comandos.
 
 **Nada acontece ao abrir (nenhuma janela, nenhum erro)**
-→ Rode pelo PowerShell para ver a mensagem de erro:
+→ Abra o app pelo terminal para ver a mensagem de erro. No PowerShell (Caminho A):
 
 ```powershell
 py "$HOME\MacroMouse\MacroMouse.pyw"
+```
+
+No terminal do Ubuntu (Caminho B):
+
+```bash
+py.exe "$(wslpath -w ~/macro-mouse/MacroMouse.pyw)"
 ```
 
 **Erro `No module named 'tkinter'`**
@@ -311,7 +339,11 @@ py "$HOME\MacroMouse\MacroMouse.pyw"
 → Programas do mouse (Logitech G HUB, Razer Synapse etc.) às vezes trocam a função desses botões. Clique em **Gravar** e aperte o botão lateral para ver o que o app recebe, e adicione o atalho com esse nome. Se nada for gravado, volte o botão para a função padrão ("voltar"/"avançar") no programa do mouse.
 
 **Aparece "O Windows protegeu o computador"**
-→ Clique em **Mais informações** e depois em **Executar assim mesmo**. Para não aparecer mais, rode o último comando da Opção 2 do [A3](#a3-baixar-o-macro-mouse) (`Unblock-File`).
+→ Clique em **Mais informações** e depois em **Executar assim mesmo**. Isso acontece quando os arquivos foram baixados pelo navegador. Para tirar o bloqueio de vez, rode no PowerShell:
+
+```powershell
+Get-ChildItem "$HOME\MacroMouse" | Unblock-File
+```
 
 **WSL: `Permission denied` ao rodar `./iniciar.sh`**
 → O arquivo perdeu a permissão de execução (acontece quando ele é editado pelo Windows). Rode:
