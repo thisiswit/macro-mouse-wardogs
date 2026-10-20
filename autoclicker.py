@@ -120,9 +120,18 @@ user32.SendInput.argtypes = (wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int)
 user32.SendInput.restype = wintypes.UINT
 user32.MapVirtualKeyW.argtypes = (wintypes.UINT, wintypes.UINT)
 user32.MapVirtualKeyW.restype = wintypes.UINT
+user32.GetCursorPos.argtypes = (ctypes.POINTER(wintypes.POINT),)
+user32.GetCursorPos.restype = wintypes.BOOL
+user32.WindowFromPoint.argtypes = (wintypes.POINT,)
+user32.WindowFromPoint.restype = wintypes.HWND
+user32.GetWindowThreadProcessId.argtypes = (wintypes.HWND, ctypes.POINTER(wintypes.DWORD))
+user32.GetWindowThreadProcessId.restype = wintypes.DWORD
 kernel32.GetModuleHandleW.argtypes = (wintypes.LPCWSTR,)
 kernel32.GetModuleHandleW.restype = wintypes.HMODULE
 kernel32.GetCurrentThreadId.restype = wintypes.DWORD
+kernel32.GetCurrentProcessId.restype = wintypes.DWORD
+
+MEU_PID = kernel32.GetCurrentProcessId()
 
 # ---------------------------------------------------------------------------
 
@@ -193,6 +202,19 @@ def soltar_modificadores(modificadores):
     user32.SendInput(len(eventos), entradas, ctypes.sizeof(INPUT))
 
 
+def mouse_sobre_o_app():
+    """O ponteiro está em cima de uma janela deste programa?
+
+    Aí não clicamos: o clique cairia nos botões do próprio app (desligaria o app,
+    apertaria "Adicionar", "Remover"...).
+    """
+    ponto = wintypes.POINT()
+    user32.GetCursorPos(ctypes.byref(ponto))
+    pid = wintypes.DWORD()
+    user32.GetWindowThreadProcessId(user32.WindowFromPoint(ponto), ctypes.byref(pid))
+    return pid.value == MEU_PID
+
+
 def botao_do_mouse(w_param, mouse_data):
     """Traduz uma mensagem do hook de mouse em (nome do botão, apertou?)."""
     if w_param in (WM_XBUTTONDOWN, WM_XBUTTONUP):
@@ -212,9 +234,11 @@ class AutoClicker:
         self.cps = 50
         self.ligado = True
         self.capturas = queue.Queue()  # atalhos gravados depois de gravar()
+        self.pausado = False  # tem atalho ativo, mas o ponteiro está em cima do app
         self._gravando = False
         self._seguradas = set()  # teclas/botões fisicamente pressionados agora
         self._engolidas = set()  # dispararam um atalho; ficam escondidas do Windows até soltar
+        self._soltas = set()     # CTRL/SHIFT/ALT seguradas que o Windows acha que foram soltas
         self._acordar = threading.Event()
         self._rodando = False
         self._erro = None
@@ -269,18 +293,22 @@ class AutoClicker:
         """Retorna True para bloquear o evento original."""
         if not apertou:
             self._seguradas.discard(nome)
+            self._soltas.discard(nome)
             for g in self.gatilhos:
                 if g.segurando and (nome == g.tecla or nome in g.modificadores):
                     g.segurando = False
                     if g.modo == "segurar":
                         g.ativo = False
-            if nome in self._engolidas:
-                self._engolidas.discard(nome)
-                return True
-            return False
+            engolida = nome in self._engolidas
+            self._engolidas.discard(nome)
+            if nome in MODIFICADORES:
+                self._trocar_atalho_segurado()
+            return engolida
 
         self._seguradas.add(nome)
-        if nome in self._engolidas:  # repetição automática de tecla segurada
+        # Repetição automática de uma tecla segurada que o Windows não deve ver de novo
+        # (a última tecla de um atalho, ou um CTRL/SHIFT/ALT que já soltamos para ele).
+        if nome in self._engolidas or nome in self._soltas:
             return True
         if self._gravando:
             return self._gravar(nome)
@@ -288,14 +316,45 @@ class AutoClicker:
             return False
         g = self._atalho_disparado(nome)
         if g is None:
-            return False
-        self._engolidas.add(nome)
+            # Se este CTRL/SHIFT/ALT trocou o atalho segurado, o atalho novo já o inclui
+            # e o Windows não precisa vê-lo (senão o clique sairia com Shift+clique).
+            return nome in MODIFICADORES and self._trocar_atalho_segurado()
+        self._disparar(g)
+        return True
+
+    def _disparar(self, g):
+        self._engolidas.add(g.tecla)
         if g.modificadores:
-            soltar_modificadores(g.modificadores)
+            self._soltar(g.modificadores)
         g.segurando = True
         g.ativo = True if g.modo == "segurar" else not g.ativo
         self._acordar.set()
-        return True
+
+    def _soltar(self, modificadores):
+        soltar_modificadores(modificadores)
+        self._soltas.update(modificadores)
+
+    def _trocar_atalho_segurado(self):
+        """CTRL/SHIFT/ALT mudou com a última tecla de um atalho "segurar" ainda apertada.
+
+        Passa a valer o atalho que bate com o que está segurado agora. Ex.: segurando
+        CTRL+Z e apertando SHIFT, vira CTRL+SHIFT+Z; soltando o SHIFT, volta para CTRL+Z.
+        Retorna True se algum atalho novo disparou.
+        """
+        if not self.ligado or self._gravando:
+            return False
+        disparou = False
+        for tecla in {g.tecla for g in self.gatilhos if g.modo == "segurar"} & self._engolidas:
+            atual = next((g for g in self.gatilhos if g.segurando and g.tecla == tecla), None)
+            novo = self._atalho_disparado(tecla)
+            if novo is atual or (atual and atual.modo != "segurar") or (novo and novo.modo != "segurar"):
+                continue
+            if atual:
+                atual.segurando = atual.ativo = False
+            if novo:
+                self._disparar(novo)
+                disparou = True
+        return disparou
 
     def _gravar(self, nome):
         # CTRL/SHIFT/ALT sozinhos ainda não fecham o atalho, e o clique esquerdo
@@ -306,7 +365,7 @@ class AutoClicker:
         self._engolidas.add(nome)
         modificadores = [m for m in MODIFICADORES if m in self._seguradas]
         if modificadores:
-            soltar_modificadores(modificadores)
+            self._soltar(modificadores)
         self.capturas.put("+".join([*modificadores, nome]))
         return True
 
@@ -327,12 +386,15 @@ class AutoClicker:
         while self._rodando:
             botoes = {g.botao for g in self.gatilhos if g.ativo} if self.ligado else set()
             if not botoes:
+                self.pausado = False
                 self._acordar.wait(0.25)
                 self._acordar.clear()
                 proximo = time.perf_counter()
                 continue
-            for botao in botoes:
-                user32.SendInput(2, cliques[botao], ctypes.sizeof(INPUT))
+            self.pausado = mouse_sobre_o_app()
+            if not self.pausado:
+                for botao in botoes:
+                    user32.SendInput(2, cliques[botao], ctypes.sizeof(INPUT))
             proximo += 1.0 / self.cps
             espera = proximo - time.perf_counter()
             if espera > 0:

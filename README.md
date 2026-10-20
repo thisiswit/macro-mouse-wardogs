@@ -272,6 +272,7 @@ Rode no **PowerShell** (não no Ubuntu) os mesmos comandos do [A5](#a5-opcional-
 |---|---|
 | **LIGADO / DESLIGADO** (botão grande) | Liga ou desliga tudo. Desligado, as teclas e os botões do mouse funcionam normalmente. |
 | **Cliques por segundo** | A velocidade. Vale na hora. Muitos jogos e sites não registram mais que 50 a 100. |
+| **Avisos** | **Bolinha perto do mouse**: aparece ao lado do ponteiro enquanto o auto-clique está ativo. **Som ao começar e parar**: um bipe subindo quando começa e descendo quando para. Dá para desligar cada um. |
 | **Atalhos**, caixinha **Usar** | Desmarque para pausar só aquele atalho. |
 | **Atalhos**, **Modo** e **Botão clicado** | Dá para trocar direto na lista. |
 | **Atalhos**, **Remover** | Apaga o atalho. |
@@ -299,10 +300,12 @@ Rode no **PowerShell** (não no Ubuntu) os mesmos comandos do [A5](#a5-opcional-
 
 ### Bom saber
 
+- **Como saber se está clicando:** a bolinha ao lado do ponteiro pisca em **verde** enquanto clica e fica **amarela** quando está pausada (ponteiro em cima do app). A letra dentro dela é o botão clicado: **E** (esquerdo), **D** (direito) ou **M** (meio). Ela não atrapalha: os cliques passam através dela e ela não tira o foco do jogo. Em jogos em tela cheia "exclusiva" ela pode não aparecer, e aí o som avisa.
 - **Combinações:** aperte primeiro o Ctrl/Shift/Alt e por último a tecla final. No modo segurar, soltar **qualquer** tecla do atalho para os cliques.
+- **Trocar sem soltar:** se dois atalhos "segurar" terminam na mesma tecla (ex.: `CTRL+Z` e `CTRL+SHIFT+Z`), dá para trocar de um para o outro segurando o Z e apertando ou soltando o Shift.
 - **Cliques limpos:** mesmo segurando Ctrl e Shift, os cliques saem como cliques normais (não viram Ctrl+clique).
 - **O atalho é "engolido":** com o app ligado, a tecla final do atalho não chega no programa que está aberto. Por exemplo, o botão lateral deixa de "voltar página" no navegador e Ctrl+Shift+Z deixa de ser "refazer". Para voltar ao normal, desligue o app ou desmarque o atalho.
-- **Onde clica:** o clique acontece onde o ponteiro do mouse estiver.
+- **Onde clica:** o clique acontece onde o ponteiro do mouse estiver. Com o ponteiro **em cima da janela do Macro Mouse**, os cliques ficam pausados (aparece "● pausado"), para o app não apertar os próprios botões. Leve o ponteiro para onde quer clicar.
 - **Configuração salva:** tudo fica salvo sozinho no arquivo `config.json`, na pasta do app. Para voltar à configuração original, feche o app, apague o `config.json` e abra de novo.
 - **Só uma janela:** abrir o app de novo com ele já aberto só traz a janela para frente.
 
